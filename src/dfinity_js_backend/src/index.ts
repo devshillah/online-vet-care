@@ -1,18 +1,18 @@
-import {
-  query,
-  update,
-  text,
-  Record,
-  StableBTreeMap,
-  Variant,
-  Vec,
-  Ok,
-  Err,
-  ic,
-  Result,
-  nat64,
-  Canister,
-  Null,
+import { 
+  query, 
+  update, 
+  text, 
+  Record, 
+  StableBTreeMap, 
+  Variant, 
+  Vec, 
+  Ok, 
+  Err, 
+  ic, 
+  Result, 
+  nat64, 
+  Canister, 
+  Null, 
 } from "azle";
 import { v4 as uuidv4 } from "uuid";
 
@@ -89,7 +89,7 @@ const Payment = Record({
   userId: text,
   appointmentId: text,
   amount: nat64,
-  status: text, // pending, completed, failed
+  status: text,
   createdAt: text,
 });
 
@@ -97,7 +97,7 @@ const PetAdoption = Record({
   id: text,
   petId: text,
   adopterId: text,
-  status: text, // pending, approved, rejected
+  status: text,
   createdAt: text,
 });
 
@@ -174,47 +174,25 @@ const petAdoptionsStorage = StableBTreeMap(8, text, PetAdoption);
 export default Canister({
   // User Management
   createUser: update([UserPayload], Result(User, Error), (payload) => {
-    if (
-      !payload.username ||
-      !payload.email ||
-      !payload.phoneNumber ||
-      !payload.role
-    ) {
+    if (!payload.username || !payload.email || !payload.phoneNumber || !payload.role) {
       return Err({ InvalidPayload: "All fields are required" });
     }
-
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(payload.email)) {
       return Err({ InvalidPayload: "Invalid email format" });
     }
-
-    // Ensure email is unique
-    const existingUser = usersStorage
-      .values()
-      .find((user) => user.email === payload.email);
-
+    const existingUser = usersStorage.values().find((user) => user.email === payload.email);
     if (existingUser) {
       return Err({ InvalidPayload: "User with email already exists" });
     }
-
-    // Ensure username is unique
-    const existingUsername = usersStorage
-      .values()
-      .find((user) => user.username === payload.username);
-
+    const existingUsername = usersStorage.values().find((user) => user.username === payload.username);
     if (existingUsername) {
-      return Err({
-        InvalidPayload: "User with username already exists, try another one",
-      });
+      return Err({ InvalidPayload: "User with username already exists" });
     }
-
-    // Validate phone number
     const phoneRegex = /^\+?[0-9]{10,14}$/;
     if (!phoneRegex.test(payload.phoneNumber)) {
       return Err({ InvalidPayload: "Invalid phone number format" });
     }
-
     const id = uuidv4();
     const user = {
       id,
@@ -224,7 +202,6 @@ export default Canister({
       role: payload.role,
       createdAt: new Date().toISOString(),
     };
-
     usersStorage.insert(id, user);
     return Ok(user);
   }),
@@ -242,7 +219,6 @@ export default Canister({
     if (!payload.name || !payload.species || !payload.breed) {
       return Err({ InvalidPayload: "All fields are required" });
     }
-
     const id = uuidv4();
     const pet = {
       id,
@@ -253,7 +229,6 @@ export default Canister({
       age: payload.age,
       createdAt: new Date().toISOString(),
     };
-
     petsStorage.insert(id, pet);
     return Ok(pet);
   }),
@@ -267,42 +242,30 @@ export default Canister({
   }),
 
   // Appointment Management
-  scheduleAppointment: update(
-    [AppointmentPayload],
-    Result(Appointment, Error),
-    (payload) => {
-      if (!payload.petId || !payload.veterinarianId || !payload.date) {
-        return Err({ InvalidPayload: "All fields are required" });
-      }
-
-      // Ensure pet exists
-      const pet = petsStorage.get(payload.petId);
-
-      if (!pet) {
-        return Err({ NotFound: "Pet not found" });
-      }
-
-      // Ensure veterinarian exists
-      const veterinarian = usersStorage.get(payload.veterinarianId);
-
-      if (!veterinarian) {
-        return Err({ NotFound: "Veterinarian not found" });
-      }
-
-      const id = uuidv4();
-      const appointment = {
-        id,
-        petId: payload.petId,
-        veterinarianId: payload.veterinarianId,
-        date: payload.date,
-        status: "scheduled",
-        createdAt: new Date().toISOString(),
-      };
-
-      appointmentsStorage.insert(id, appointment);
-      return Ok(appointment);
+  scheduleAppointment: update([AppointmentPayload], Result(Appointment, Error), (payload) => {
+    if (!payload.petId || !payload.veterinarianId || !payload.date) {
+      return Err({ InvalidPayload: "All fields are required" });
     }
-  ),
+    const pet = petsStorage.get(payload.petId);
+    if (!pet) {
+      return Err({ NotFound: "Pet not found" });
+    }
+    const veterinarian = usersStorage.get(payload.veterinarianId);
+    if (!veterinarian) {
+      return Err({ NotFound: "Veterinarian not found" });
+    }
+    const id = uuidv4();
+    const appointment = {
+      id,
+      petId: payload.petId,
+      veterinarianId: payload.veterinarianId,
+      date: payload.date,
+      status: "scheduled",
+      createdAt: new Date().toISOString(),
+    };
+    appointmentsStorage.insert(id, appointment);
+    return Ok(appointment);
+  }),
 
   getAppointments: query([], Result(Vec(Appointment), Error), () => {
     const appointments = appointmentsStorage.values();
@@ -313,45 +276,30 @@ export default Canister({
   }),
 
   // Health Records Management
-  addHealthRecord: update(
-    [HealthRecordPayload],
-    Result(HealthRecord, Error),
-    (payload) => {
-      if (!payload.record) {
-        return Err({ InvalidPayload: "Record is required" });
-      }
-
-      // Ensure pet exists
-      const pet = petsStorage.get(payload.petId);
-
-      if (!pet) {
-        return Err({ NotFound: `Pet with id ${payload.petId} not found` });
-      }
-
-      // Ensure veterinarian exists
-      const veterinarian = usersStorage.get(payload.veterinarianId);
-
-      if (!veterinarian) {
-        return Err({
-          NotFound: `Veterinarian with id ${payload.veterinarianId} not found`,
-        });
-      }
-
-      const id = uuidv4();
-      const healthRecord = {
-        id,
-        petId: payload.petId,
-        veterinarianId: payload.veterinarianId,
-        record: payload.record,
-        createdAt: new Date().toISOString(),
-      };
-
-      healthRecordsStorage.insert(id, healthRecord);
-      return Ok(healthRecord);
+  addHealthRecord: update([HealthRecordPayload], Result(HealthRecord, Error), (payload) => {
+    if (!payload.record) {
+      return Err({ InvalidPayload: "Record is required" });
     }
-  ),
+    const pet = petsStorage.get(payload.petId);
+    if (!pet) {
+      return Err({ NotFound: `Pet with id ${payload.petId} not found` });
+    }
+    const veterinarian = usersStorage.get(payload.veterinarianId);
+    if (!veterinarian) {
+      return Err({ NotFound: `Veterinarian with id ${payload.veterinarianId} not found` });
+    }
+    const id = uuidv4();
+    const healthRecord = {
+      id,
+      petId: payload.petId,
+      veterinarianId: payload.veterinarianId,
+      record: payload.record,
+      createdAt: new Date().toISOString(),
+    };
+    healthRecordsStorage.insert(id, healthRecord);
+    return Ok(healthRecord);
+  }),
 
-  //  Get Health Records
   getHealthRecords: query([], Result(Vec(HealthRecord), Error), () => {
     const healthRecords = healthRecordsStorage.values();
     if (healthRecords.length === 0) {
@@ -361,47 +309,31 @@ export default Canister({
   }),
 
   // Prescription Management
-  addPrescription: update(
-    [PrescriptionPayload],
-    Result(Prescription, Error),
-    (payload) => {
-      // Validate payload
-      if (!payload.medication || !payload.dosage) {
-        return Err({ InvalidPayload: "All fields are required" });
-      }
-
-      // Ensure pet exists
-      const pet = petsStorage.get(payload.petId);
-
-      if (!pet) {
-        return Err({ NotFound: `Pet with id ${payload.petId} not found` });
-      }
-
-      // Ensure veterinarian exists
-      const veterinarian = usersStorage.get(payload.veterinarianId);
-
-      if (!veterinarian) {
-        return Err({
-          NotFound: `Veterinarian with id ${payload.veterinarianId} not found`,
-        });
-      }
-
-      const id = uuidv4();
-      const prescription = {
-        id,
-        petId: payload.petId,
-        veterinarianId: payload.veterinarianId,
-        medication: payload.medication,
-        dosage: payload.dosage,
-        createdAt: new Date().toISOString(),
-      };
-
-      prescriptionsStorage.insert(id, prescription);
-      return Ok(prescription);
+  addPrescription: update([PrescriptionPayload], Result(Prescription, Error), (payload) => {
+    if (!payload.medication || !payload.dosage) {
+      return Err({ InvalidPayload: "Medication and dosage are required" });
     }
-  ),
+    const pet = petsStorage.get(payload.petId);
+    if (!pet) {
+      return Err({ NotFound: "Pet not found" });
+    }
+    const veterinarian = usersStorage.get(payload.veterinarianId);
+    if (!veterinarian) {
+      return Err({ NotFound: "Veterinarian not found" });
+    }
+    const id = uuidv4();
+    const prescription = {
+      id,
+      petId: payload.petId,
+      veterinarianId: payload.veterinarianId,
+      medication: payload.medication,
+      dosage: payload.dosage,
+      createdAt: new Date().toISOString(),
+    };
+    prescriptionsStorage.insert(id, prescription);
+    return Ok(prescription);
+  }),
 
-  // Get Prescriptions
   getPrescriptions: query([], Result(Vec(Prescription), Error), () => {
     const prescriptions = prescriptionsStorage.values();
     if (prescriptions.length === 0) {
@@ -412,25 +344,14 @@ export default Canister({
 
   // Message Management
   sendMessage: update([MessagePayload], Result(Message, Error), (payload) => {
-    // Validate payload to ensure all fields are present
-    if (!payload.senderId || !payload.recipientId || !payload.content) {
-      return Err({ InvalidPayload: "All fields are required" });
+    if (!payload.content) {
+      return Err({ InvalidPayload: "Content is required" });
     }
-
-    // Ensure sender exists
     const sender = usersStorage.get(payload.senderId);
-
-    if (!sender) {
-      return Err({ NotFound: `User with id ${payload.senderId} not found` });
-    }
-
-    // Ensure recipient exists
     const recipient = usersStorage.get(payload.recipientId);
-
-    if (!recipient) {
-      return Err({ NotFound: `User with id ${payload.recipientId} not found` });
+    if (!sender || !recipient) {
+      return Err({ NotFound: "Sender or recipient not found" });
     }
-
     const id = uuidv4();
     const message = {
       id,
@@ -439,12 +360,10 @@ export default Canister({
       content: payload.content,
       createdAt: new Date().toISOString(),
     };
-
     messagesStorage.insert(id, message);
     return Ok(message);
   }),
 
-  // Get Messages
   getMessages: query([], Result(Vec(Message), Error), () => {
     const messages = messagesStorage.values();
     if (messages.length === 0) {
@@ -454,31 +373,22 @@ export default Canister({
   }),
 
   // Notification Management
-  sendNotification: update(
-    [text, text],
-    Result(Notification, Error),
-    (userId, message) => {
-      // Ensure user exists
-      const user = usersStorage.get(userId);
-
-      if (!user) {
-        return Err({ NotFound: `User with id ${userId} not found` });
-      }
-
-      const id = uuidv4();
-      const notification = {
-        id,
-        userId,
-        message,
-        createdAt: new Date().toISOString(),
-      };
-
-      notificationsStorage.insert(id, notification);
-      return Ok(notification);
+  sendNotification: update([text, text], Result(Notification, Error), (userId, message) => {
+    const user = usersStorage.get(userId);
+    if (!user) {
+      return Err({ NotFound: "User not found" });
     }
-  ),
+    const id = uuidv4();
+    const notification = {
+      id,
+      userId,
+      message,
+      createdAt: new Date().toISOString(),
+    };
+    notificationsStorage.insert(id, notification);
+    return Ok(notification);
+  }),
 
-  // Get Notifications
   getNotifications: query([], Result(Vec(Notification), Error), () => {
     const notifications = notificationsStorage.values();
     if (notifications.length === 0) {
@@ -489,27 +399,11 @@ export default Canister({
 
   // Payment Management
   makePayment: update([PaymentPayload], Result(Payment, Error), (payload) => {
-    // Validate payload
-    if (!payload.userId || !payload.appointmentId || !payload.amount) {
-      return Err({ InvalidPayload: "All fields are required" });
-    }
-
-    // Ensure user exists
     const user = usersStorage.get(payload.userId);
-
-    if (!user) {
-      return Err({ NotFound: `User with id ${payload.userId} not found` });
-    }
-
-    // Ensure appointment exists
     const appointment = appointmentsStorage.get(payload.appointmentId);
-
-    if (!appointment) {
-      return Err({
-        NotFound: `Appointment with id ${payload.appointmentId} not found`,
-      });
+    if (!user || !appointment) {
+      return Err({ NotFound: "User or appointment not found" });
     }
-
     const id = uuidv4();
     const payment = {
       id,
@@ -519,12 +413,10 @@ export default Canister({
       status: "pending",
       createdAt: new Date().toISOString(),
     };
-
     paymentsStorage.insert(id, payment);
     return Ok(payment);
   }),
 
-  // Get Payments
   getPayments: query([], Result(Vec(Payment), Error), () => {
     const payments = paymentsStorage.values();
     if (payments.length === 0) {
@@ -534,44 +426,27 @@ export default Canister({
   }),
 
   // Pet Adoption Management
-  adoptPet: update(
-    [PetAdoptionPayload],
-    Result(PetAdoption, Error),
-    (payload) => {
-      // Validate payload
-      if (!payload.petId || !payload.adopterId) {
-        return Err({ InvalidPayload: "All fields are required" });
-      }
-
-      // Ensure pet exists
-      const pet = petsStorage.get(payload.petId);
-
-      if (!pet) {
-        return Err({ NotFound: `Pet with id ${payload.petId} not found` });
-      }
-
-      // Ensure adopter exists
-      const adopter = usersStorage.get(payload.adopterId);
-
-      if (!adopter) {
-        return Err({ NotFound: `User with id ${payload.adopterId} not found` });
-      }
-
-      const id = uuidv4();
-      const petAdoption = {
-        id,
-        petId: payload.petId,
-        adopterId: payload.adopterId,
-        status: "pending",
-        createdAt: new Date().toISOString(),
-      };
-
-      petAdoptionsStorage.insert(id, petAdoption);
-      return Ok(petAdoption);
+  adoptPet: update([PetAdoptionPayload], Result(PetAdoption, Error), (payload) => {
+    const pet = petsStorage.get(payload.petId);
+    if (!pet) {
+      return Err({ NotFound: "Pet not found" });
     }
-  ),
+    const adopter = usersStorage.get(payload.adopterId);
+    if (!adopter) {
+      return Err({ NotFound: "Adopter not found" });
+    }
+    const id = uuidv4();
+    const adoption = {
+      id,
+      petId: payload.petId,
+      adopterId: payload.adopterId,
+      status: "pending",
+      createdAt: new Date().toISOString(),
+    };
+    petAdoptionsStorage.insert(id, adoption);
+    return Ok(adoption);
+  }),
 
-  // Get Pet Adoptions
   getPetAdoptions: query([], Result(Vec(PetAdoption), Error), () => {
     const petAdoptions = petAdoptionsStorage.values();
     if (petAdoptions.length === 0) {
@@ -579,45 +454,4 @@ export default Canister({
     }
     return Ok(petAdoptions);
   }),
-
-  // Get User Pets
-  getUserPets: query([text], Result(Vec(Pet), Error), (userId) => {
-    const userPets = petsStorage
-      .values()
-      .filter((pet) => pet.ownerId === userId);
-    if (userPets.length === 0) {
-      return Err({ NotFound: "No pets found for user" });
-    }
-    return Ok(userPets);
-  }),
-
-  // Get User Appointments
-  getUserAppointments: query(
-    [text],
-    Result(Vec(Appointment), Error),
-    (userId) => {
-      const userAppointments = appointmentsStorage
-        .values()
-        .filter((appointment) => appointment.petId === userId);
-      if (userAppointments.length === 0) {
-        return Err({ NotFound: "No appointments found for user" });
-      }
-      return Ok(userAppointments);
-    }
-  ),
-
-  // Get User Health Records
-  getUserHealthRecords: query(
-    [text],
-    Result(Vec(HealthRecord), Error),
-    (userId) => {
-      const userHealthRecords = healthRecordsStorage
-        .values()
-        .filter((healthRecord) => healthRecord.petId === userId);
-      if (userHealthRecords.length === 0) {
-        return Err({ NotFound: "No health records found for user" });
-      }
-      return Ok(userHealthRecords);
-    }
-  ),
 });
